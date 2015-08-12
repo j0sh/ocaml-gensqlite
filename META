@@ -1,0 +1,15 @@
+version = "0.1"
+description = "Simple tooling for OCaml-SQLite3"
+requires = "sqlite3"
+archive(byte) = "gensqlite.cma"
+archive(byte, plugin) = "gensqlite.cma"
+archive(native) = "gensqlite.cmxa"
+archive(native, plugin) = "gensqlite.cmxs"
+exists_if = "gensqlite.cma"
+
+package "ppx" (
+  version = "0.1"
+  description = "PPX processor for gensqlite"
+  requires = "re,ppx_tools,gensqlite"
+  ppx = "ppx_gensqlite"
+)
