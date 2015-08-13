@@ -45,4 +45,4 @@ uninstall:
 	rm $(shell dirname `which ocamlfind`)/ppx_gensqlite
 
 clean:
-	rm -f *.cm[ioxa] *.cmx[as] *.a *.cache $(PROGS)
+	rm -f *.cm[ioxa] *.cmx[as] *.o *.a *.cache $(PROGS)
