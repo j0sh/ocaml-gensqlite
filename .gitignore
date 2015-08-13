@@ -1,0 +1,27 @@
+# files for this project
+test.sqlite
+*.swp
+
+# the following taken from:
+# https://github.com/github/gitignore/blob/master/OCaml.gitignore
+
+*.annot
+*.cmo
+*.cma
+*.cmi
+*.a
+*.o
+*.cmx
+*.cmxs
+*.cmxa
+
+# ocamlbuild working directory
+_build/
+
+# ocamlbuild targets
+*.byte
+*.native
+
+# oasis generated files
+setup.data
+setup.log
