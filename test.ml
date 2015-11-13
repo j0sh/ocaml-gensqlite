@@ -55,7 +55,7 @@ let test_ints _ =
   assert_equal ~printer expected g
 
 let test_gensqlite _ =
-  let open Sqlite_tools in
+  let open Gensqlite_tools in
   let open Sqlite3 in
   let dbx = db_open (Filename.temp_file "gensqlite" "gensqlite") in
 

@@ -5,7 +5,7 @@ Gensqlite is a bit of tooling for working with SQLite, implemented as a ppx
 processor to generate prepared statements and query functions. This is based
 off the excellent [SQLite3-OCaml](https://github.com/mmottl/sqlite3-ocaml/)
 As such, there is minimal wrapping of SQLite3 types and functions, aside from a
-few convenience functions in the auxiliary `Sqlite_tools` module.
+few convenience functions in the auxiliary `Gensqlite_tools` module.
 
 ### Installation
 ----------------
@@ -34,13 +34,13 @@ literal string query, then returns a prepared statement and a query function
 parameterized by any necessary variable bindings. Here is a simple example:
 
 ```ocaml
-open Sqlite_tools
+open Gensqlite_tools
 let dbh = SQLite3.db_open "test.sqlite"
 let (stmt, query) = [%gensqlite dbh "CREATE TABLE users(name TEXT UNIQUE, password TEXT, created INTEGER DEFAULT CURRENT_TIMESTAMP)"]
 let () = query (); (* Voila! A new table is created! *)
 ```
 
-The Sqlite_tools module contains utility functions that are called by the
+The Gensqlite_tools module contains utility functions that are called by the
 `gensqlite` processor, and a few helper functions that can be used .
 
 #### Error Handling

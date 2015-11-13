@@ -9,7 +9,7 @@ PKGS = compiler-libs.common,ppx_tools.metaquot,re
 ppx_gensqlite: t.ml ppx_gensqlite.ml
 	$(CC) -package $(PKGS) -linkpkg -o $@ $^
 
-gensqlite.%: sqlite_tools.ml
+gensqlite.%: gensqlite_tools.ml
 	$(CC) -package sqlite3 $(LIB_CFLAGS) -o $@ $^
 
 test: gensqlite.cma t.ml test.ml
@@ -37,7 +37,7 @@ $(SAMPLES): sample.% : $(gensqlite) sample.ml
 lib: ppx_gensqlite gensqlite.cmxa gensqlite.cma gensqlite.cmxs
 
 install: lib
-	ocamlfind install gensqlite META LICENSE gensqlite.* sqlite_tools.cmi
+	ocamlfind install gensqlite META LICENSE gensqlite.* gensqlite_tools.cmi
 	cp ppx_gensqlite $(shell dirname `which ocamlfind`)
 
 uninstall:

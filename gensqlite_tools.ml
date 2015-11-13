@@ -1,4 +1,4 @@
-(** Sqlite_tools: utility functions for gensqlite *)
+(** Gensqlite_tools: utility functions for gensqlite *)
 
 (** [close_db] is a helper to close the database handle [db]. Successful closes
  * return unit. If closing fails for whatever reason, the attempt is retried up

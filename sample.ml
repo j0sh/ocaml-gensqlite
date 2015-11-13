@@ -1,4 +1,4 @@
-open Sqlite_tools
+open Gensqlite_tools
 
 let dbx = Sqlite3.db_open "test.sqlite"
 
