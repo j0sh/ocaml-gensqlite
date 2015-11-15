@@ -1,37 +1,32 @@
 open OUnit
 
-open T
-
-let sample_query = [
-  QueryString "INSERT INTO users(name, role) VALUES(";
-  StringParam "name";
-  QueryString ",";
-  IntParam "role";
-  QueryString ")";
-]
+open Q
 
 let ae = assert_equal ~printer:(fun x -> x)
-let pq q = parse_query q |> to_sql
+let pq q = process q |> function (sql, _, _) -> sql
 
 let test _ =
 
-  let s = to_sql sample_query in
-  ae "INSERT INTO users(name, role) VALUES(:name,:role)" s;
-
-  let s = pq "insert into values(>@device, >@agency)" in
+  let s = pq "insert into values(%s{device}, %s{agency})" in
   ae "insert into values(:device, :agency)" s;
 
-  let s = pq ">@device is here" in
+  let s = pq "%d{device} is here" in
   ae ":device is here" s;
 
-  let s = pq "device is >@here" in
+  let s = pq "device is %s{here}" in
   ae "device is :here" s;
 
+  (* a bit irrelevant now but we should do something similar *)
   let s = pq "@device :is :@here" in
   ae "@device :is :@here" s;
 
-  let s = pq ">@:device ::is >:@here" in
-  ae "::device ::is :@here" s;
+  (* unnamed outputs should not match (return as-is). unlabelled inputs as ? *)
+  let s = pq "@s@s %d@s{abc}%d@s%d@s%d{def}%d{ghi}@s" in
+  ae "@s@s ?abc?@s?@s:def:ghi@s" s;
+
+  (* label is not alphanumeric so interpret as unnamed *)
+  let s = pq "%s{:device} ::is >:@here" in
+  ae "?{:device} ::is >:@here" s;
 
   let s = pq "excellent" in
   ae "excellent" s
@@ -39,19 +34,19 @@ let test _ =
 
 let outputs _ =
 
-  let s = pq "<:output device <@okay zug" in
+  let s = pq "@d{output} device @s{okay} zug" in
   ae "output device okay zug" s;
 
-  let s = pq "output <@really <@okay" in
+  let s = pq "output @s{really} @s{okay}" in
   ae "output really okay" s
 
 
 let test_ints _ =
   (* parse and remove spaces *)
-  let g = parse_query ">?h <?h >$b <$b " in
-  let g = List.filter (function QueryString _ -> false | _ -> true) g in
-  let expected = [Int32Param "h"; Int32Output "h"; Int64Param "b"; Int64Output "b"] in
-  let printer x = List.map T.to_raw x |> String.concat "" in
+  let (_, inputs, outputs) = process "%n{h} @n{h} %L{b} @L{b}" in
+  let g = List.map param2type inputs @ List.map param2type outputs in
+  let expected = [Int32; Int64; Int32; Int64] in
+  let printer x = List.map typ2ocamlstr x |> String.concat "," in
   assert_equal ~printer expected g
 
 let test_gensqlite _ =
@@ -73,9 +68,11 @@ let test_gensqlite _ =
 
   drop_table () |> create_table;
 
-  let (insert_s, insert) = [%gensqlite dbx "insert into users(name) values(>@name)"] in
-  let (select_s, select) = [%gensqlite dbx "select <:id, <@name, strftime('%s', <?created) from users where name = >@name"] in
-  let (select2_s, select2) = [%gensqlite dbx "select <@id, strftime('%s', <$created) from users where name = >:name"] in
+  let (insert_s, insert) = [%gensqlite dbx "insert into users(name) values(%s{name})"] in
+  let (select_s, select) = [%gensqlite dbx "select @d{id}, @s{name}, strftime('%s',
+  @n{created}) from users where name = %s{name}"] in
+  let (select2_s, select2) = [%gensqlite dbx "select @s{id}, strftime('%s',
+  @L{created}) from users where name = %d{name}"] in
 
   (* get current timestamp to verify handling of boxed int32s and values that
    * would otherwise overflow a ocaml int (ticks since epoch)
@@ -101,29 +98,30 @@ let test_gensqlite _ =
   assert_equal ~msg (("2", Int64.of_int32 now)::[]) res;
 
   (* test single output and aggregates *)
-  let (select3_s, select3) = [%gensqlite dbx "select count(*) as <:count from users"] in
+  let (select3_s, select3) = [%gensqlite dbx "select count(*) as @d{count} from users"] in
   let res = select3 () in
   let printer x = List.map string_of_int x |> String.concat "," in
   assert_equal ~msg:"select3" ~printer (3::[]) res;
 
-  (* an interesting case from the README. Returns the first column, 'id' *)
-  let (select4_s, select4) = [%gensqlite dbx "select <:* from users"] in
-  let res = select4 () in
-  assert_equal ~msg:"select4" ~printer (3::2::1::[]) res;
-
   (* if this compiles and runs it's probably OK *)
   (* note that all prepared statements must be finalized prior to closing *)
   let stmts = drop_s :: create_s :: insert_s :: select_s :: select2_s :: [] in
-  let stmts = select3_s :: select4_s :: stmts in
+  let stmts = select3_s :: stmts in
   List.iter (fun s -> ignore(Sqlite3.finalize s)) stmts;
   close_db dbx
+
+let test_quotes _ =
+  let s = pq "strftime('%s-%d', %s-%d @s{abc}%d{def} '@s{abc}%d{def}')" in
+  ae "strftime('%s-%d', ?-? abc:def '@s{abc}%d{def}')" s;
+  ()
 
 let tests =
   "gensqlite_tests">::: [
     "test_input">::test;
     "test_output">::outputs;
     "test_ints">::test_ints;
-    "test_gensqlite">::test_gensqlite
+    "test_gensqlite">::test_gensqlite;
+    "test_quotes">::test_quotes;
   ]
 
 let _ = run_test_tt_main tests

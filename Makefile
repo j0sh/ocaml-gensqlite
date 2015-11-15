@@ -4,16 +4,16 @@ all:  $(PROGS)
 CC=ocamlfind ocamlc
 CC_native=ocamlfind ocamlopt
 
-PKGS = compiler-libs.common,ppx_tools.metaquot,re
+PKGS = compiler-libs.common,ppx_tools.metaquot,re.pcre
 
-ppx_gensqlite: t.ml ppx_gensqlite.ml
+ppx_gensqlite: q.ml ppx_gensqlite.ml
 	$(CC) -package $(PKGS) -linkpkg -o $@ $^
 
 gensqlite.%: gensqlite_tools.ml
 	$(CC) -package sqlite3 $(LIB_CFLAGS) -o $@ $^
 
-test: gensqlite.cma t.ml test.ml
-	$(CC) -package re,oUnit,sqlite3 -ppx "./ppx_gensqlite" -o $@ -linkpkg $^
+test: gensqlite.cma q.ml test.ml
+	$(CC) -package re.pcre,oUnit,sqlite3 -ppx "./ppx_gensqlite" -o $@ -linkpkg $^
 
 BACKENDS=native byte
 LIB_CFLAGS=-a

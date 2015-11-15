@@ -6,29 +6,31 @@ open Longident
 
 let get_loc { pstr_loc = loc; } = loc
 
-let gen_stuff dbh sql loc =
+let gen_stuff dbh str loc =
   let mklid s = {txt=Lident s; loc} in
   let mkident s = Exp.ident (mklid s) in
   let mkstr s = Exp.constant ~loc (Const_string (s, None)) in
   let mkint i = Exp.constant ~loc (Const_int i) in
-  let qs = T.parse_query sql in (* tokenize input "sql" *)
-  let sql = mkstr (T.to_sql qs) in (* generate the actual sql *)
-  (* only keep the input variables for processing *)
-  let outputs = T.filter_outputs qs in
-  let qs = T.filter_params qs |> List.rev in
-  (* misc helper functions *)
-  let q2t = function T.IntParam _ -> "int" | T.Int32Param _ -> "int32"
-    | T.Int64Param _ -> "int64" | _ -> "string" in
-  let q2n = T.to_raw in
+  let (sql, inputs, outputs) = Q.process str in
+  let sql = mkstr sql in
+  let q2t = Q.paramtype2str in
+  let q2n = Q.name in
+  let q2label qn =
+    let (label, _) = q2n qn in
+    label in
+  let q2arg qn =
+    let (_, arg) = q2n qn in
+    arg in
   let q2tp sadf =
     let constr = Typ.constr (mklid (q2t sadf)) [] in
-    Pat.constraint_ (Pat.var {txt=(q2n sadf);loc}) constr in
+    let txt = q2arg sadf in
+    Pat.constraint_ (Pat.var {txt;loc}) constr in
   (* generate callback tuple *)
   let zogs = fun i -> function
-    | T.IntOutput s -> [%expr data2int s [%e mkint i]]
-    | T.Int32Output s -> [%expr data2int32 s [%e mkint i]]
-    | T.Int64Output s -> [%expr data2int64 s [%e mkint i]]
-    | s -> [%expr data2str s [%e mkint i]] in
+    | (s, Q.Int, _) -> [%expr data2int s [%e mkint i]]
+    | (s, Q.Int32, _) -> [%expr data2int32 s [%e mkint i]]
+    | (s, Q.Int64, _) -> [%expr data2int64 s [%e mkint i]]
+    | (s, _, _) -> [%expr data2str s [%e mkint i]] in
   let zogt = Exp.tuple (List.mapi zogs outputs) in
   let query_call =
     if List.length outputs >= 2 then zogt
@@ -42,19 +44,25 @@ let gen_stuff dbh sql loc =
     !ret
   ] else [%expr query stmt ] in (* simple case for no outputs *)
   (* generate bindings for output variables *)
+  let ctr = ref 0 in
   let q2b acc qn =
-    let s = q2n qn in
-    let cf = (function T.IntParam _ -> "sqint" | T.Int32Param _ -> "sqint32"
-      | T.Int64Param _ -> "sqint64" | _ -> "sqtext") qn in
-    let val_ = [%expr ([%e mkident cf] [%e mkident s])] in
-    let z = [%expr bind_var stmt [%e mkstr s] [%e val_]] in
+    incr ctr;
+    let (label, arg) = q2n qn in (* extract arg name *)
+    (* todo: floats, bools and options *)
+    let cf = (function Q.Int -> "sqint" | Q.Int32 -> "sqint32"
+      | Q.Int64 -> "sqint64" | _ -> "sqtext") (Q.param2type qn) in
+    let val_ = [%expr ([%e mkident cf] [%e mkident arg])] in
+    let z =
+      if "" = label
+      then [%expr bind_idx stmt [%e mkint !ctr] [%e val_]]
+      else [%expr bind_var stmt [%e mkstr arg] [%e val_]] in
     Exp.sequence z acc in
-  let binds = List.fold_left q2b base qs in
+  let binds = List.fold_left q2b base inputs in
   (* generate function params *)
   let initial = Exp.fun_ "" None (Pat.construct (mklid "()") None) binds in
   (*let initial = Exp.fun_ "" None (Pat.mk (Ppat_var {txt="()"; loc})) binds in*)
-  let q2f acc qn = Exp.fun_ (q2n qn) None (q2tp qn) acc in
-  let bind_f = List.fold_left q2f initial qs in
+  let q2f acc qn = Exp.fun_ (q2label qn) None (q2tp qn) acc in
+  let bind_f = List.fold_left q2f initial inputs in
   (* generate record type based on outvars *)
   (* currently unused...
   let q2tc qn = Typ.constr (mklid (q2t qn)) [] in

@@ -29,16 +29,22 @@ let enforce_fks dbh =
 (* The rest of these functions should not be used; they are really meant for
  * gensqlite internal use. *)
 
-let bind_var stmt name data = try
-  let idx = Sqlite3.bind_parameter_index stmt (":" ^ name) in
+let bind_idx stmt idx data = try
   let res = Sqlite3.bind stmt idx data in
   if Sqlite3.Rc.OK <> res then begin
-    let str = Printf.sprintf "%s Unable to bind %s for %s"
+    let str = Printf.sprintf "%s Unable to bind index %d for %s"
       (Sqlite3.Rc.to_string res)
-      name
+      idx
       (Sqlite3.Data.to_string_debug data) in
     raise (Sqlite3.Error str)
   end
+with Not_found ->
+  let str = Printf.sprintf "Error! Index %d not found for statement" idx in
+  raise (Sqlite3.Error str)
+
+let bind_var stmt name data = try
+  let idx = Sqlite3.bind_parameter_index stmt (":" ^ name) in
+  bind_idx stmt idx data
 with Not_found ->
   let str = Printf.sprintf "Error! Named index %s not found for statement" name in
   raise (Sqlite3.Error str)

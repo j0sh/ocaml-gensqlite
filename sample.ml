@@ -10,7 +10,7 @@ current_timestamp, check(trim(name)<>''));"]
 
 let () = drop_table () |> create_table
 
-let (insert_s, ins) = [%gensqlite dbx "insert into users(name) values(>@name)"]
+let (insert_s, ins) = [%gensqlite dbx "insert into users(name) values(%s{name})"]
 
 let () = ()
   |> ins ~name:"beakybird"
@@ -18,8 +18,8 @@ let () = ()
   |> ins ~name:"lateralligator"
   |> ins ~name:"1001"
 
-let (select_s, q) = [%gensqlite dbx "select <:id, <@name, strftime('%s', <?created) from users where
-name = >@name"]
+let (select_s, q) = [%gensqlite dbx "select @d{id}, @s{name}, strftime('%s', @n{created}) from users where
+name = %s{name}"]
 
 let print_res = function
   | (id, name, created)::_ ->
@@ -30,8 +30,8 @@ let () = q ~name:"lateralligator" () |> print_res
 
 let () = q ~name:"squeamish ossifrage" () |> print_res
 
-let (select2_s, q2) = [%gensqlite dbx "select <@id, <:name, strftime('%s', <$created)
-from users where name = >:name"]
+let (select2_s, q2) = [%gensqlite dbx "select @s{id}, @d{name}, strftime('%s',@L{created})
+from users where name = %d{name}"]
 
 let print_res2 = function
   | (id, name, created)::_ ->
